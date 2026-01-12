@@ -1,0 +1,23 @@
+on:
+  push:
+    paths-ignore:
+      - "README.md"
+      - ".github/**"
+    branches:
+      - main
+
+env:
+  CRATES_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+      - name: Build package
+        run: cargo build --release
+      - name: Publish package
+        run: cargo publish --token ${CRATES_TOKEN}
