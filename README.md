@@ -4,8 +4,6 @@ Low-level Rust library for input injection on Linux.
 
 Creates and manages virtual keyboard and mouse devices directly in the kernel input subsystem, independent of distribution or any graphical environment.
 
----
-
 ## Features
 
 - Kernel-level virtual input devices
@@ -13,8 +11,6 @@ Creates and manages virtual keyboard and mouse devices directly in the kernel in
 - Global input delivery (real-hardware equivalent)
 - No graphical or compositor dependencies
 - Minimal, low-level API
-
----
 
 ## Usage
 
@@ -31,8 +27,6 @@ fn main() {
     device.mouse.left_click();
 }
 ```
-
----
 
 ## Setup script for non-root user
 ```bash
@@ -52,8 +46,6 @@ else
 fi
 ```
 Logout and login required.
-
----
 
 ## Scope
 
