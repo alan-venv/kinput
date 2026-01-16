@@ -16,6 +16,11 @@ use std::os::unix::io::RawFd;
 use std::thread::sleep;
 use std::time::Duration;
 
+/// Low-level wrapper around a `/dev/uinput` file descriptor.
+///
+/// `Device` performs the uinput ioctl sequence to register a virtual input
+/// device with the kernel and then emits events by writing `InputEvent`
+/// structures to the uinput FD.
 #[derive(Clone)]
 pub struct Device {
     fd: RawFd,
@@ -59,13 +64,9 @@ impl Device {
     fn setup_device(fd: RawFd) {
         unsafe {
             ui_set_evbit(fd, EV_KEY as u64).unwrap();
-
-            // KEYBOARD
             for key in 1..=119 {
                 ui_set_keybit(fd, key as u64).unwrap();
             }
-
-            // MOUSE
             ui_set_keybit(fd, BTN_LEFT as u64).unwrap();
             ui_set_evbit(fd, EV_REL as u64).unwrap();
             ui_set_relbit(fd, REL_X as u64).unwrap();

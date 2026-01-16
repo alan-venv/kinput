@@ -91,6 +91,7 @@ pub enum Key {
 }
 
 impl Key {
+    /// Returns the Linux key code associated with this key.
     pub fn value(&self) -> u16 {
         match self {
             Self::Esc => 1,
