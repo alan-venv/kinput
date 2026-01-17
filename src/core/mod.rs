@@ -1,6 +1,7 @@
 mod device;
 mod keyboard;
 mod mouse;
+mod worker;
 
 pub use device::Device;
 pub use device::DeviceType;

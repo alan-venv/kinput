@@ -1,3 +1,4 @@
+use crate::core::worker::{KeyboardAction, KeyboardMsg, KeyboardWorker};
 use crate::types::constants::*;
 use crate::types::structs::{InputEvent, UInputAbsSetup, UInputSetup};
 
@@ -15,12 +16,11 @@ ioctl_none!(ui_dev_create, b'U', 1);
 ioctl_none!(ui_dev_destroy, b'U', 2);
 
 use std::os::unix::io::RawFd;
-use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
+use std::sync::mpsc::{SyncSender, sync_channel};
 use std::thread::{self, JoinHandle, sleep};
 use std::time::Duration;
 
 const KEYBOARD_QUEUE_CAPACITY: usize = 1024;
-const KEYBOARD_ACTION_DELAY: Duration = Duration::from_millis(2);
 
 /// Low-level wrapper around a `/dev/uinput` device.
 ///
@@ -228,6 +228,7 @@ impl Device {
         sleep(Duration::from_millis(500));
     }
 
+    // Será removido quando os mouses também tiverem seus workers
     fn emit_fd(fd: RawFd, type_: u16, code: u16, value: i32) {
         let ev = InputEvent {
             time: libc::timeval {
@@ -263,56 +264,6 @@ impl Drop for Device {
                     let _ = handle.join();
                 }
             }
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-enum KeyboardAction {
-    Press(u16),
-    Release(u16),
-}
-
-enum KeyboardMsg {
-    Action(KeyboardAction),
-    Shutdown,
-}
-
-struct KeyboardWorker {
-    fd: RawFd,
-    rx: Receiver<KeyboardMsg>,
-}
-
-impl KeyboardWorker {
-    fn run(fd: RawFd, rx: Receiver<KeyboardMsg>) {
-        let worker = Self { fd, rx };
-        worker.event_loop();
-    }
-
-    fn event_loop(self) {
-        while let Ok(msg) = self.rx.recv() {
-            match msg {
-                KeyboardMsg::Action(action) => {
-                    match action {
-                        KeyboardAction::Press(key) => {
-                            Device::emit_fd(self.fd, EV_KEY, key, 1);
-                            Device::emit_fd(self.fd, EV_SYN, SYN_REPORT, 0);
-                        }
-                        KeyboardAction::Release(key) => {
-                            Device::emit_fd(self.fd, EV_KEY, key, 0);
-                            Device::emit_fd(self.fd, EV_SYN, SYN_REPORT, 0);
-                        }
-                    }
-
-                    sleep(KEYBOARD_ACTION_DELAY);
-                }
-                KeyboardMsg::Shutdown => break,
-            }
-        }
-
-        unsafe {
-            let _ = ui_dev_destroy(self.fd);
-            let _ = libc::close(self.fd);
         }
     }
 }
