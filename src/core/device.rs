@@ -20,6 +20,7 @@ use std::thread::{self, JoinHandle, sleep};
 use std::time::Duration;
 
 const KEYBOARD_QUEUE_CAPACITY: usize = 1024;
+const KEYBOARD_ACTION_DELAY: Duration = Duration::from_millis(2);
 
 /// Low-level wrapper around a `/dev/uinput` device.
 ///
@@ -291,16 +292,20 @@ impl KeyboardWorker {
     fn event_loop(self) {
         while let Ok(msg) = self.rx.recv() {
             match msg {
-                KeyboardMsg::Action(action) => match action {
-                    KeyboardAction::Press(key) => {
-                        Device::emit_fd(self.fd, EV_KEY, key, 1);
-                        Device::emit_fd(self.fd, EV_SYN, SYN_REPORT, 0);
+                KeyboardMsg::Action(action) => {
+                    match action {
+                        KeyboardAction::Press(key) => {
+                            Device::emit_fd(self.fd, EV_KEY, key, 1);
+                            Device::emit_fd(self.fd, EV_SYN, SYN_REPORT, 0);
+                        }
+                        KeyboardAction::Release(key) => {
+                            Device::emit_fd(self.fd, EV_KEY, key, 0);
+                            Device::emit_fd(self.fd, EV_SYN, SYN_REPORT, 0);
+                        }
                     }
-                    KeyboardAction::Release(key) => {
-                        Device::emit_fd(self.fd, EV_KEY, key, 0);
-                        Device::emit_fd(self.fd, EV_SYN, SYN_REPORT, 0);
-                    }
-                },
+
+                    sleep(KEYBOARD_ACTION_DELAY);
+                }
                 KeyboardMsg::Shutdown => break,
             }
         }

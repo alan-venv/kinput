@@ -1,6 +1,4 @@
 use std::rc::Rc;
-use std::thread::sleep;
-use std::time::Duration;
 
 use crate::core::device::Device;
 use crate::types::enums::Key;

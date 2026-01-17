@@ -51,21 +51,9 @@ mod tests {
     fn main() {
         let device = InputDevice::new();
 
-        device.keyboard.click(Key::A);
-        device.keyboard.click(Key::B);
-        device.keyboard.click(Key::C);
-        device.keyboard.click(Key::D);
-        device.keyboard.click(Key::A);
-        device.keyboard.click(Key::B);
-        device.keyboard.click(Key::C);
-        device.keyboard.click(Key::D);
-        device.keyboard.click(Key::A);
-        device.keyboard.click(Key::B);
-        device.keyboard.click(Key::C);
-        device.keyboard.click(Key::D);
-        device.keyboard.click(Key::A);
-        device.keyboard.click(Key::B);
-        device.keyboard.click(Key::C);
-        device.keyboard.click(Key::D);
+        device.keyboard.press(Key::LeftShift);
+        device.keyboard.press(Key::Num1);
+        device.keyboard.release(Key::Num1);
+        device.keyboard.release(Key::LeftShift);
     }
 }
