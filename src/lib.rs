@@ -42,3 +42,30 @@ impl From<(i32, i32)> for InputDevice {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn main() {
+        let device = InputDevice::new();
+
+        device.keyboard.click(Key::A);
+        device.keyboard.click(Key::B);
+        device.keyboard.click(Key::C);
+        device.keyboard.click(Key::D);
+        device.keyboard.click(Key::A);
+        device.keyboard.click(Key::B);
+        device.keyboard.click(Key::C);
+        device.keyboard.click(Key::D);
+        device.keyboard.click(Key::A);
+        device.keyboard.click(Key::B);
+        device.keyboard.click(Key::C);
+        device.keyboard.click(Key::D);
+        device.keyboard.click(Key::A);
+        device.keyboard.click(Key::B);
+        device.keyboard.click(Key::C);
+        device.keyboard.click(Key::D);
+    }
+}

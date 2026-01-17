@@ -26,9 +26,7 @@ impl Keyboard {
     /// Presses and releases a key.
     pub fn click(&self, key: Key) {
         self.press(key);
-        sleep(Duration::from_millis(5));
         self.release(key);
-        sleep(Duration::from_millis(10));
     }
 
     /// Presses a key.

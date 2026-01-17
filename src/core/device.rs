@@ -15,17 +15,30 @@ ioctl_none!(ui_dev_create, b'U', 1);
 ioctl_none!(ui_dev_destroy, b'U', 2);
 
 use std::os::unix::io::RawFd;
-use std::thread::sleep;
+use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
+use std::thread::{self, JoinHandle, sleep};
 use std::time::Duration;
 
-/// Low-level wrapper around a `/dev/uinput` file descriptor.
+const KEYBOARD_QUEUE_CAPACITY: usize = 1024;
+
+/// Low-level wrapper around a `/dev/uinput` device.
 ///
-/// `Device` performs the uinput ioctl sequence to register a virtual input
-/// device with the kernel and then emits events by writing `InputEvent`
-/// structures to the uinput FD.
-#[derive(Clone)]
+/// For `DeviceType::Keyboard`, key actions are enqueued into a bounded
+/// `sync_channel` and written by a dedicated worker thread (backpressure).
+///
+/// For other device types, events are written directly to the uinput FD.
 pub struct Device {
-    fd: RawFd,
+    inner: DeviceInner,
+}
+
+enum DeviceInner {
+    Direct {
+        fd: RawFd,
+    },
+    Keyboard {
+        tx: SyncSender<KeyboardMsg>,
+        worker: Option<JoinHandle<()>>,
+    },
 }
 
 pub enum DeviceType {
@@ -38,46 +51,94 @@ impl Device {
     pub fn new(r#type: DeviceType) -> Self {
         let fd = Self::open_uinput();
         match r#type {
-            DeviceType::Keyboard => Self::setup_keyboard(fd),
-            DeviceType::RelativeMouse => Self::setup_relative_mouse(fd),
-            DeviceType::AbsoluteMouse => Self::setup_absolute_mouse(fd),
-        }
+            DeviceType::Keyboard => {
+                Self::setup_keyboard(fd);
 
-        Self { fd: fd }
+                // Give the kernel/userspace a moment to register the new device.
+                sleep(Duration::from_millis(500));
+
+                let (tx, rx) = sync_channel::<KeyboardMsg>(KEYBOARD_QUEUE_CAPACITY);
+                let worker = Some(thread::spawn(move || KeyboardWorker::run(fd, rx)));
+
+                Self {
+                    inner: DeviceInner::Keyboard { tx, worker },
+                }
+            }
+            DeviceType::RelativeMouse => {
+                Self::setup_relative_mouse(fd);
+                Self {
+                    inner: DeviceInner::Direct { fd },
+                }
+            }
+            DeviceType::AbsoluteMouse => {
+                Self::setup_absolute_mouse(fd);
+                Self {
+                    inner: DeviceInner::Direct { fd },
+                }
+            }
+        }
     }
 
     pub fn press(&self, key: u16) {
-        self.emit(EV_KEY, key, 1);
-        self.emit(EV_SYN, SYN_REPORT, 0);
+        match &self.inner {
+            DeviceInner::Keyboard { tx, .. } => {
+                tx.send(KeyboardMsg::Action(KeyboardAction::Press(key)))
+                    .expect("keyboard worker stopped");
+            }
+            DeviceInner::Direct { fd } => {
+                Self::emit_fd(*fd, EV_KEY, key, 1);
+                Self::emit_fd(*fd, EV_SYN, SYN_REPORT, 0);
+            }
+        }
     }
 
     pub fn release(&self, key: u16) {
-        self.emit(EV_KEY, key, 0);
-        self.emit(EV_SYN, SYN_REPORT, 0);
+        match &self.inner {
+            DeviceInner::Keyboard { tx, .. } => {
+                tx.send(KeyboardMsg::Action(KeyboardAction::Release(key)))
+                    .expect("keyboard worker stopped");
+            }
+            DeviceInner::Direct { fd } => {
+                Self::emit_fd(*fd, EV_KEY, key, 0);
+                Self::emit_fd(*fd, EV_SYN, SYN_REPORT, 0);
+            }
+        }
     }
 
     pub fn move_relative(&self, x: i32, y: i32) {
-        self.emit(EV_REL, REL_X, x);
-        self.emit(EV_REL, REL_Y, y);
-        self.emit(EV_SYN, SYN_REPORT, 0);
+        match &self.inner {
+            DeviceInner::Keyboard { .. } => panic!("move_relative called on keyboard device"),
+            DeviceInner::Direct { fd } => {
+                Self::emit_fd(*fd, EV_REL, REL_X, x);
+                Self::emit_fd(*fd, EV_REL, REL_Y, y);
+                Self::emit_fd(*fd, EV_SYN, SYN_REPORT, 0);
+            }
+        }
     }
 
     pub fn move_absolute(&self, x: i32, y: i32) {
-        self.emit(EV_ABS, ABS_X, x);
-        self.emit(EV_ABS, ABS_Y, y);
-        self.emit(EV_SYN, SYN_REPORT, 0);
+        match &self.inner {
+            DeviceInner::Keyboard { .. } => panic!("move_absolute called on keyboard device"),
+            DeviceInner::Direct { fd } => {
+                Self::emit_fd(*fd, EV_ABS, ABS_X, x);
+                Self::emit_fd(*fd, EV_ABS, ABS_Y, y);
+                Self::emit_fd(*fd, EV_SYN, SYN_REPORT, 0);
+            }
+        }
     }
 
     fn open_uinput() -> RawFd {
         let path = std::ffi::CString::new("/dev/uinput").unwrap();
-        let fd = unsafe { libc::open(path.as_ptr(), libc::O_WRONLY | libc::O_NONBLOCK) };
+        // Open in blocking mode: the worker thread can block on write, and the
+        // bounded queue provides backpressure to callers.
+        let fd = unsafe { libc::open(path.as_ptr(), libc::O_WRONLY) };
         if fd < 0 {
             panic!(
                 "open /dev/uinput failed: {}",
                 std::io::Error::last_os_error()
             );
         }
-        return fd;
+        fd
     }
 
     fn setup_keyboard(fd: RawFd) {
@@ -101,7 +162,6 @@ impl Device {
             ui_dev_setup(fd, &setup).unwrap();
             ui_dev_create(fd).unwrap();
         }
-        sleep(Duration::from_millis(500));
     }
 
     fn setup_relative_mouse(fd: RawFd) {
@@ -167,7 +227,7 @@ impl Device {
         sleep(Duration::from_millis(500));
     }
 
-    fn emit(&self, type_: u16, code: u16, value: i32) {
+    fn emit_fd(fd: RawFd, type_: u16, code: u16, value: i32) {
         let ev = InputEvent {
             time: libc::timeval {
                 tv_sec: 0,
@@ -179,7 +239,7 @@ impl Device {
         };
 
         let size = std::mem::size_of::<InputEvent>();
-        let ret = unsafe { libc::write(self.fd, &ev as *const _ as *const libc::c_void, size) };
+        let ret = unsafe { libc::write(fd, &ev as *const _ as *const libc::c_void, size) };
         if ret != size as isize {
             panic!(
                 "write failed or partial write: {}",
@@ -191,6 +251,60 @@ impl Device {
 
 impl Drop for Device {
     fn drop(&mut self) {
+        match &mut self.inner {
+            DeviceInner::Direct { fd } => unsafe {
+                let _ = ui_dev_destroy(*fd);
+                let _ = libc::close(*fd);
+            },
+            DeviceInner::Keyboard { tx, worker } => {
+                let _ = tx.send(KeyboardMsg::Shutdown);
+                if let Some(handle) = worker.take() {
+                    let _ = handle.join();
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+enum KeyboardAction {
+    Press(u16),
+    Release(u16),
+}
+
+enum KeyboardMsg {
+    Action(KeyboardAction),
+    Shutdown,
+}
+
+struct KeyboardWorker {
+    fd: RawFd,
+    rx: Receiver<KeyboardMsg>,
+}
+
+impl KeyboardWorker {
+    fn run(fd: RawFd, rx: Receiver<KeyboardMsg>) {
+        let worker = Self { fd, rx };
+        worker.event_loop();
+    }
+
+    fn event_loop(self) {
+        while let Ok(msg) = self.rx.recv() {
+            match msg {
+                KeyboardMsg::Action(action) => match action {
+                    KeyboardAction::Press(key) => {
+                        Device::emit_fd(self.fd, EV_KEY, key, 1);
+                        Device::emit_fd(self.fd, EV_SYN, SYN_REPORT, 0);
+                    }
+                    KeyboardAction::Release(key) => {
+                        Device::emit_fd(self.fd, EV_KEY, key, 0);
+                        Device::emit_fd(self.fd, EV_SYN, SYN_REPORT, 0);
+                    }
+                },
+                KeyboardMsg::Shutdown => break,
+            }
+        }
+
         unsafe {
             let _ = ui_dev_destroy(self.fd);
             let _ = libc::close(self.fd);
