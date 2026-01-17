@@ -5,6 +5,16 @@ use std::time::Duration;
 use crate::core::device::Device;
 use crate::types::constants::{BTN_LEFT, BTN_RIGHT};
 
+/// Mouse controls.
+///
+/// Use `rel` for relative movement and `abs` for absolute positioning.
+pub struct Mouse {
+    /// Relative mouse (delta movement).
+    pub rel: RelativeMouse,
+    /// Absolute mouse (positioning).
+    pub abs: AbsoluteMouse,
+}
+
 /// Relative mouse for movement and clicks.
 pub struct RelativeMouse {
     device: Rc<Device>,
@@ -48,12 +58,18 @@ impl RelativeMouse {
 /// Absolute mouse for movement and clicks.
 pub struct AbsoluteMouse {
     device: Rc<Device>,
+    width: i32,
+    height: i32,
 }
 
 impl AbsoluteMouse {
     /// Creates an `AbsoluteMouse`.
-    pub fn new(device: Rc<Device>) -> Self {
-        Self { device }
+    pub fn new(device: Rc<Device>, width: i32, height: i32) -> Self {
+        Self {
+            device,
+            width,
+            height,
+        }
     }
 
     /// Left click.
@@ -80,7 +96,29 @@ impl AbsoluteMouse {
 
     /// Moves the mouse to an absolute position.
     pub fn move_xy(&self, x: i32, y: i32) {
-        self.device.move_absolute(x, y);
+        self.device.move_absolute(self.abs_x(x), self.abs_y(y));
         sleep(Duration::from_millis(30));
+    }
+
+    fn abs_x(&self, pixel: i32) -> i32 {
+        Self::abs_from_px(pixel, self.width)
+    }
+
+    fn abs_y(&self, pixel: i32) -> i32 {
+        Self::abs_from_px(pixel, self.height)
+    }
+
+    fn abs_from_px(mut px: i32, size_px: i32) -> i32 {
+        if size_px <= 1 {
+            return 0;
+        }
+        if px < 0 {
+            px = 0;
+        } else if px > size_px - 1 {
+            px = size_px - 1;
+        }
+        let px = px as i64;
+        let size_px = size_px as i64;
+        ((px * 65535 + (size_px - 2) / 2) / (size_px - 1)) as i32
     }
 }

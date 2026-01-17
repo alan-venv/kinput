@@ -1,7 +1,7 @@
 mod core;
 mod types;
 
-use crate::core::{AbsoluteMouse, Device, DeviceType, Keyboard, RelativeMouse};
+use crate::core::{AbsoluteMouse, Device, DeviceType, Keyboard, Mouse, RelativeMouse};
 use std::rc::Rc;
 
 /// Keyboard keys supported by `kinput`.
@@ -15,26 +15,23 @@ pub struct InputDevice {
     pub keyboard: Keyboard,
 }
 
-/// Mouse controls.
-///
-/// Use `rel` for relative movement and `abs` for absolute positioning.
-pub struct Mouse {
-    /// Relative mouse (delta movement).
-    pub rel: RelativeMouse,
-    /// Absolute mouse (positioning).
-    pub abs: AbsoluteMouse,
+impl InputDevice {
+    /// Creates a new `InputDevice` with a default absolute mouse area of `1920x1080`.
+    pub fn new() -> Self {
+        Self::from((1920, 1080))
+    }
 }
 
-impl InputDevice {
-    /// Creates a new `InputDevice`.
-    pub fn new() -> Self {
+impl From<(i32, i32)> for InputDevice {
+    /// Creates a new `InputDevice` with a custom absolute mouse area.
+    fn from((width, height): (i32, i32)) -> Self {
         let keyboard_device = Device::new(DeviceType::Keyboard);
         let relative_mouse_device = Device::new(DeviceType::RelativeMouse);
         let absolute_mouse_device = Device::new(DeviceType::AbsoluteMouse);
 
         let keyboard = Keyboard::new(Rc::new(keyboard_device));
         let relative_mouse = RelativeMouse::new(Rc::new(relative_mouse_device));
-        let absolute_mouse = AbsoluteMouse::new(Rc::new(absolute_mouse_device));
+        let absolute_mouse = AbsoluteMouse::new(Rc::new(absolute_mouse_device), width, height);
 
         Self {
             mouse: Mouse {
