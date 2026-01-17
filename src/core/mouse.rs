@@ -41,4 +41,9 @@ impl Mouse {
     pub fn move_relative(&self, x: i32, y: i32) {
         self.device.move_relative(x, y);
     }
+
+    /// Moves the mouse by a absolute delta.
+    pub fn move_absolute(&self, x: i32, y: i32) {
+        self.device.move_absolute(x, y);
+    }
 }

@@ -25,3 +25,9 @@ impl InputDevice {
         }
     }
 }
+
+pub fn main() {
+    let device = InputDevice::new();
+
+    device.mouse.move_absolute(100, 100);
+}

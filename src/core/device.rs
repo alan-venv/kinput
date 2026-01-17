@@ -1,5 +1,5 @@
 use crate::types::constants::*;
-use crate::types::structs::{InputEvent, UInputSetup};
+use crate::types::structs::{InputEvent, UInputAbsSetup, UInputSetup};
 
 use nix::ioctl_none;
 use nix::ioctl_write_int;
@@ -8,7 +8,9 @@ use nix::ioctl_write_ptr;
 ioctl_write_int!(ui_set_evbit, b'U', 100);
 ioctl_write_int!(ui_set_keybit, b'U', 101);
 ioctl_write_int!(ui_set_relbit, b'U', 102);
+ioctl_write_int!(ui_set_absbit, b'U', 103);
 ioctl_write_ptr!(ui_dev_setup, b'U', 3, UInputSetup);
+ioctl_write_ptr!(ui_abs_setup, b'U', 4, UInputAbsSetup);
 ioctl_none!(ui_dev_create, b'U', 1);
 ioctl_none!(ui_dev_destroy, b'U', 2);
 
@@ -49,6 +51,12 @@ impl Device {
         self.emit(EV_SYN, SYN_REPORT, 0);
     }
 
+    pub fn move_absolute(&self, x: i32, y: i32) {
+        self.emit(EV_ABS, ABS_X, x);
+        self.emit(EV_ABS, ABS_Y, y);
+        self.emit(EV_SYN, SYN_REPORT, 0);
+    }
+
     fn open_uinput() -> RawFd {
         let path = std::ffi::CString::new("/dev/uinput").unwrap();
         let fd = unsafe { libc::open(path.as_ptr(), libc::O_WRONLY | libc::O_NONBLOCK) };
@@ -64,13 +72,32 @@ impl Device {
     fn setup_device(fd: RawFd) {
         unsafe {
             ui_set_evbit(fd, EV_KEY as u64).unwrap();
+
             for key in 1..=119 {
                 ui_set_keybit(fd, key as u64).unwrap();
             }
+
             ui_set_keybit(fd, BTN_LEFT as u64).unwrap();
+            ui_set_keybit(fd, BTN_RIGHT as u64).unwrap();
+
             ui_set_evbit(fd, EV_REL as u64).unwrap();
             ui_set_relbit(fd, REL_X as u64).unwrap();
             ui_set_relbit(fd, REL_Y as u64).unwrap();
+
+            ui_set_evbit(fd, EV_ABS as u64).unwrap();
+            ui_set_absbit(fd, ABS_X as u64).unwrap();
+            ui_set_absbit(fd, ABS_Y as u64).unwrap();
+
+            let mut abs_x: UInputAbsSetup = std::mem::zeroed();
+            abs_x.code = ABS_X;
+            abs_x.absinfo.minimum = 0;
+            abs_x.absinfo.maximum = 65535;
+            ui_abs_setup(fd, &abs_x).unwrap();
+            let mut abs_y: UInputAbsSetup = std::mem::zeroed();
+            abs_y.code = ABS_Y;
+            abs_y.absinfo.minimum = 0;
+            abs_y.absinfo.maximum = 65535;
+            ui_abs_setup(fd, &abs_y).unwrap();
 
             let mut setup: UInputSetup = std::mem::zeroed();
             setup.id.bustype = BUS_USB;

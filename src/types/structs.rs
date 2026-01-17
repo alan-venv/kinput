@@ -20,3 +20,19 @@ pub struct UInputSetup {
     pub name: [u8; 80],
     pub ff_effects_max: u32,
 }
+
+#[repr(C)]
+pub struct UInputAbsSetup {
+    pub code: u16,
+    pub absinfo: UInputAbsInfo,
+}
+
+#[repr(C)]
+pub struct UInputAbsInfo {
+    pub value: i32,
+    pub minimum: i32,
+    pub maximum: i32,
+    pub fuzz: i32,
+    pub flat: i32,
+    pub resolution: i32,
+}
