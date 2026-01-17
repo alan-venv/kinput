@@ -9,14 +9,19 @@ pub use crate::types::enums::Key;
 
 /// Virtual input device with keyboard and mouse.
 pub struct InputDevice {
-    /// Mouse actions (move/click).
+    /// Mouse actions.
     pub mouse: Mouse,
-    /// Keyboard actions (press/type).
+    /// Keyboard actions.
     pub keyboard: Keyboard,
 }
 
+/// Mouse controls.
+///
+/// Use `rel` for relative movement and `abs` for absolute positioning.
 pub struct Mouse {
+    /// Relative mouse (delta movement).
     pub rel: RelativeMouse,
+    /// Absolute mouse (positioning).
     pub abs: AbsoluteMouse,
 }
 
