@@ -22,9 +22,14 @@ fn main() {
 
     device.keyboard.text([H, E, L, L, O, Space, W, O, R, L, D]);
 
-    device.mouse.reset_axis();
-    device.mouse.move_relative(500, 350);
-    device.mouse.left_click();
+    // Relative movement.
+    device.mouse.rel.reset_axis();
+    device.mouse.rel.move_xy(500, 350);
+    device.mouse.rel.left_click();
+
+    // Absolute positioning.
+    device.mouse.abs.move_xy(300, 300);
+    device.mouse.abs.left_click();
 }
 ```
 
