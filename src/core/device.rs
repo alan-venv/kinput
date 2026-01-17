@@ -28,10 +28,21 @@ pub struct Device {
     fd: RawFd,
 }
 
+pub enum DeviceType {
+    Keyboard,
+    RelativeMouse,
+    AbsoluteMouse,
+}
+
 impl Device {
-    pub fn new() -> Self {
+    pub fn new(r#type: DeviceType) -> Self {
         let fd = Self::open_uinput();
-        Self::setup_device(fd);
+        match r#type {
+            DeviceType::Keyboard => Self::setup_keyboard(fd),
+            DeviceType::RelativeMouse => Self::setup_relative_mouse(fd),
+            DeviceType::AbsoluteMouse => Self::setup_absolute_mouse(fd),
+        }
+
         Self { fd: fd }
     }
 
@@ -69,7 +80,7 @@ impl Device {
         return fd;
     }
 
-    fn setup_device(fd: RawFd) {
+    fn setup_keyboard(fd: RawFd) {
         unsafe {
             ui_set_evbit(fd, EV_KEY as u64).unwrap();
 
@@ -77,12 +88,53 @@ impl Device {
                 ui_set_keybit(fd, key as u64).unwrap();
             }
 
+            let mut setup: UInputSetup = std::mem::zeroed();
+            setup.id.bustype = BUS_USB;
+            setup.id.vendor = 0x1234;
+            setup.id.product = 0x5678;
+            setup.id.version = 0;
+            setup.ff_effects_max = 0;
+
+            let name = b"Keyboard device\0";
+            setup.name[..name.len()].copy_from_slice(name);
+
+            ui_dev_setup(fd, &setup).unwrap();
+            ui_dev_create(fd).unwrap();
+        }
+        sleep(Duration::from_millis(500));
+    }
+
+    fn setup_relative_mouse(fd: RawFd) {
+        unsafe {
+            ui_set_evbit(fd, EV_KEY as u64).unwrap();
             ui_set_keybit(fd, BTN_LEFT as u64).unwrap();
             ui_set_keybit(fd, BTN_RIGHT as u64).unwrap();
 
             ui_set_evbit(fd, EV_REL as u64).unwrap();
             ui_set_relbit(fd, REL_X as u64).unwrap();
             ui_set_relbit(fd, REL_Y as u64).unwrap();
+
+            let mut setup: UInputSetup = std::mem::zeroed();
+            setup.id.bustype = BUS_USB;
+            setup.id.vendor = 0x1234;
+            setup.id.product = 0x5678;
+            setup.id.version = 0;
+            setup.ff_effects_max = 0;
+
+            let name = b"Relative mouse device\0";
+            setup.name[..name.len()].copy_from_slice(name);
+
+            ui_dev_setup(fd, &setup).unwrap();
+            ui_dev_create(fd).unwrap();
+        }
+        sleep(Duration::from_millis(500));
+    }
+
+    fn setup_absolute_mouse(fd: RawFd) {
+        unsafe {
+            ui_set_evbit(fd, EV_KEY as u64).unwrap();
+            ui_set_keybit(fd, BTN_LEFT as u64).unwrap();
+            ui_set_keybit(fd, BTN_RIGHT as u64).unwrap();
 
             ui_set_evbit(fd, EV_ABS as u64).unwrap();
             ui_set_absbit(fd, ABS_X as u64).unwrap();
@@ -106,7 +158,7 @@ impl Device {
             setup.id.version = 0;
             setup.ff_effects_max = 0;
 
-            let name = b"Example device\0";
+            let name = b"Absolute mouse device\0";
             setup.name[..name.len()].copy_from_slice(name);
 
             ui_dev_setup(fd, &setup).unwrap();
