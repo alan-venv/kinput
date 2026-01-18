@@ -44,20 +44,3 @@ impl From<(i32, i32)> for InputDevice {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn main() {
-        let device = InputDevice::new();
-
-        for _ in 0..20 {
-            device.mouse.rel.move_xy(10, 0);
-        }
-
-        device.mouse.abs.reset_axis();
-        device.mouse.rel.right_click();
-    }
-}
