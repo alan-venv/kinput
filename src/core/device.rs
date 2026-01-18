@@ -40,11 +40,11 @@ enum DeviceInner {
         fd: RawFd,
     },
     Keyboard {
-        tx: SyncSender<KeyboardMsg>,
+        tx: Option<SyncSender<KeyboardMsg>>,
         worker: Option<JoinHandle<()>>,
     },
     RelativeMouse {
-        tx: SyncSender<RelativeMouseMsg>,
+        tx: Option<SyncSender<RelativeMouseMsg>>,
         worker: Option<JoinHandle<()>>,
     },
 }
@@ -69,7 +69,10 @@ impl Device {
                 let worker = Some(thread::spawn(move || KeyboardWorker::run(fd, rx)));
 
                 Self {
-                    inner: DeviceInner::Keyboard { tx, worker },
+                    inner: DeviceInner::Keyboard {
+                        tx: Some(tx),
+                        worker,
+                    },
                 }
             }
             DeviceType::RelativeMouse => {
@@ -82,7 +85,10 @@ impl Device {
                 let worker = Some(thread::spawn(move || RelativeMouseWorker::run(fd, rx)));
 
                 Self {
-                    inner: DeviceInner::RelativeMouse { tx, worker },
+                    inner: DeviceInner::RelativeMouse {
+                        tx: Some(tx),
+                        worker,
+                    },
                 }
             }
             DeviceType::AbsoluteMouse => {
@@ -97,7 +103,9 @@ impl Device {
     pub fn press(&self, key: u16) {
         match &self.inner {
             DeviceInner::Keyboard { tx, .. } => {
-                tx.send(KeyboardMsg::Action(KeyboardAction::Press(key)))
+                tx.as_ref()
+                    .expect("keyboard sender missing")
+                    .send(KeyboardMsg::Action(KeyboardAction::Press(key)))
                     .expect("keyboard worker stopped");
             }
             DeviceInner::RelativeMouse { .. } => {
@@ -113,7 +121,9 @@ impl Device {
     pub fn release(&self, key: u16) {
         match &self.inner {
             DeviceInner::Keyboard { tx, .. } => {
-                tx.send(KeyboardMsg::Action(KeyboardAction::Release(key)))
+                tx.as_ref()
+                    .expect("keyboard sender missing")
+                    .send(KeyboardMsg::Action(KeyboardAction::Release(key)))
                     .expect("keyboard worker stopped");
             }
             DeviceInner::RelativeMouse { .. } => {
@@ -130,7 +140,9 @@ impl Device {
         match &self.inner {
             DeviceInner::Keyboard { .. } => panic!("move_relative called on keyboard device"),
             DeviceInner::RelativeMouse { tx, .. } => {
-                tx.send(RelativeMouseMsg::Action(RelativeMouseAction::Move(x, y)))
+                tx.as_ref()
+                    .expect("relative mouse sender missing")
+                    .send(RelativeMouseMsg::Action(RelativeMouseAction::Move(x, y)))
                     .expect("relative mouse worker stopped");
             }
             DeviceInner::Direct { fd } => {
@@ -286,13 +298,19 @@ impl Drop for Device {
                 let _ = libc::close(*fd);
             },
             DeviceInner::Keyboard { tx, worker } => {
-                let _ = tx.send(KeyboardMsg::Shutdown);
+                // Drop the sender first so the worker can exit even if no one
+                // is receiving the shutdown message.
+                if let Some(tx) = tx.take() {
+                    let _ = tx.send(KeyboardMsg::Shutdown);
+                }
                 if let Some(handle) = worker.take() {
                     let _ = handle.join();
                 }
             }
             DeviceInner::RelativeMouse { tx, worker } => {
-                let _ = tx.send(RelativeMouseMsg::Shutdown);
+                if let Some(tx) = tx.take() {
+                    let _ = tx.send(RelativeMouseMsg::Shutdown);
+                }
                 if let Some(handle) = worker.take() {
                     let _ = handle.join();
                 }

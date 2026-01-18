@@ -10,6 +10,10 @@ ioctl_none!(ui_dev_destroy, b'U', 2);
 
 const KEYBOARD_ACTION_DELAY: Duration = Duration::from_millis(2);
 
+// Upper bound to avoid starving the emitter if producers are extremely fast.
+const REL_MOUSE_DRAIN_LIMIT: usize = 100;
+const REL_MOUSE_DRAIN_BUDGET: Duration = Duration::from_micros(200);
+
 #[derive(Debug, Copy, Clone)]
 pub enum KeyboardAction {
     Press(u16),
@@ -88,26 +92,32 @@ impl RelativeMouseWorker {
     }
 
     fn event_loop(self) {
-        let mut last_execution = Instant::now() - KEYBOARD_ACTION_DELAY;
+        let mut last_execution = Instant::now() - Duration::from_millis(10);
         let mut queued_dx: i32 = 0;
         let mut queued_dy: i32 = 0;
 
         while let Ok(msg) = self.rx.recv() {
             match msg {
                 RelativeMouseMsg::Action(RelativeMouseAction::Move(mut dx, mut dy)) => {
-                    // Coalesce any moves already waiting in the channel.
-                    while let Ok(m) = self.rx.try_recv() {
-                        match m {
-                            RelativeMouseMsg::Action(RelativeMouseAction::Move(x, y)) => {
+                    // Coalesce moves already waiting in the channel.
+                    // Guard rails prevent spending unbounded time draining.
+                    let drain_deadline = Instant::now() + REL_MOUSE_DRAIN_BUDGET;
+                    let mut drained = 0usize;
+
+                    while drained < REL_MOUSE_DRAIN_LIMIT && Instant::now() < drain_deadline {
+                        match self.rx.try_recv() {
+                            Ok(RelativeMouseMsg::Action(RelativeMouseAction::Move(x, y))) => {
                                 dx += x;
                                 dy += y;
+                                drained += 1;
                             }
-                            RelativeMouseMsg::Shutdown => {
+                            Ok(RelativeMouseMsg::Shutdown) => {
                                 // Execute what we have buffered before shutting down.
                                 queued_dx += dx;
                                 queued_dy += dy;
                                 break;
                             }
+                            Err(_) => break,
                         }
                     }
 

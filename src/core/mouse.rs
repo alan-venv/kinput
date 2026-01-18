@@ -51,7 +51,6 @@ impl RelativeMouse {
     /// Moves the mouse by a relative delta.
     pub fn move_xy(&self, x: i32, y: i32) {
         self.device.move_relative(x, y);
-        sleep(Duration::from_millis(30));
     }
 }
 

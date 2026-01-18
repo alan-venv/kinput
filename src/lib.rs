@@ -45,6 +45,8 @@ impl From<(i32, i32)> for InputDevice {
 
 #[cfg(test)]
 mod tests {
+    use std::{thread::sleep, time::Duration};
+
     use super::*;
 
     #[test]
@@ -56,9 +58,11 @@ mod tests {
         device.keyboard.release(Key::Num1);
         device.keyboard.release(Key::LeftShift);
 
-        for _ in 0..100 {
+        for _ in 0..6000 {
             device.mouse.rel.move_xy(500, 0);
             device.mouse.rel.move_xy(-500, 0);
         }
+
+        sleep(Duration::from_secs(1));
     }
 }
