@@ -1,13 +1,13 @@
-mod device;
-mod keyboard;
-mod mouse;
+mod devices;
 mod uinput;
-mod worker;
+mod workers;
+mod wrappers;
 
-pub use device::AbsoluteMouseDevice;
-pub use device::KeyboardDevice;
-pub use device::RelativeMouseDevice;
-pub use keyboard::Keyboard;
-pub use mouse::AbsoluteMouse;
-pub use mouse::Mouse;
-pub use mouse::RelativeMouse;
+pub use devices::AbsoluteMouseDevice;
+pub use devices::KeyboardDevice;
+pub use devices::RelativeMouseDevice;
+
+pub use wrappers::AbsoluteMouse;
+pub use wrappers::Keyboard;
+pub use wrappers::Mouse;
+pub use wrappers::RelativeMouse;

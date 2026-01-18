@@ -1,10 +1,9 @@
 mod core;
 mod types;
 
-use crate::core::{
-    AbsoluteMouse, AbsoluteMouseDevice, Keyboard, KeyboardDevice, Mouse, RelativeMouse,
-    RelativeMouseDevice,
-};
+use crate::core::{AbsoluteMouse, Keyboard, Mouse, RelativeMouse};
+use crate::core::{AbsoluteMouseDevice, KeyboardDevice, RelativeMouseDevice};
+
 use std::rc::Rc;
 
 /// Keyboard keys supported by `kinput`.

@@ -1,51 +1,7 @@
 use std::rc::Rc;
 
-use crate::core::{AbsoluteMouseDevice, RelativeMouseDevice};
+use crate::core::AbsoluteMouseDevice;
 use crate::types::constants::{BTN_LEFT, BTN_RIGHT};
-
-/// Mouse controls.
-///
-/// Use `rel` for relative movement and `abs` for absolute positioning.
-pub struct Mouse {
-    /// Relative mouse (delta movement).
-    pub rel: RelativeMouse,
-    /// Absolute mouse (positioning).
-    pub abs: AbsoluteMouse,
-}
-
-/// Relative mouse for movement and clicks.
-pub struct RelativeMouse {
-    device: Rc<RelativeMouseDevice>,
-}
-
-impl RelativeMouse {
-    /// Creates a `RelativeMouse`.
-    pub fn new(device: Rc<RelativeMouseDevice>) -> Self {
-        Self { device }
-    }
-
-    /// Left click.
-    pub fn left_click(&self) {
-        self.device.press(BTN_LEFT);
-        self.device.release(BTN_LEFT);
-    }
-
-    /// Right click.
-    pub fn right_click(&self) {
-        self.device.press(BTN_RIGHT);
-        self.device.release(BTN_RIGHT);
-    }
-
-    /// Moves the cursor to the top-left corner.
-    pub fn reset_axis(&self) {
-        self.device.move_relative(-10000, -10000);
-    }
-
-    /// Moves the mouse by a relative delta.
-    pub fn move_xy(&self, x: i32, y: i32) {
-        self.device.move_relative(x, y);
-    }
-}
 
 /// Absolute mouse for movement and clicks.
 pub struct AbsoluteMouse {
