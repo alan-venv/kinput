@@ -55,5 +55,10 @@ mod tests {
         device.keyboard.press(Key::Num1);
         device.keyboard.release(Key::Num1);
         device.keyboard.release(Key::LeftShift);
+
+        for _ in 0..100 {
+            device.mouse.rel.move_xy(500, 0);
+            device.mouse.rel.move_xy(-500, 0);
+        }
     }
 }

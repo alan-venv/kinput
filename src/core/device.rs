@@ -1,4 +1,7 @@
-use crate::core::worker::{KeyboardAction, KeyboardMsg, KeyboardWorker};
+use crate::core::worker::{
+    KeyboardAction, KeyboardMsg, KeyboardWorker, RelativeMouseAction, RelativeMouseMsg,
+    RelativeMouseWorker,
+};
 use crate::types::constants::*;
 use crate::types::structs::{InputEvent, UInputAbsSetup, UInputSetup};
 
@@ -40,6 +43,10 @@ enum DeviceInner {
         tx: SyncSender<KeyboardMsg>,
         worker: Option<JoinHandle<()>>,
     },
+    RelativeMouse {
+        tx: SyncSender<RelativeMouseMsg>,
+        worker: Option<JoinHandle<()>>,
+    },
 }
 
 pub enum DeviceType {
@@ -67,8 +74,15 @@ impl Device {
             }
             DeviceType::RelativeMouse => {
                 Self::setup_relative_mouse(fd);
+
+                // Give the kernel/userspace a moment to register the new device.
+                sleep(Duration::from_millis(500));
+
+                let (tx, rx) = sync_channel::<RelativeMouseMsg>(KEYBOARD_QUEUE_CAPACITY);
+                let worker = Some(thread::spawn(move || RelativeMouseWorker::run(fd, rx)));
+
                 Self {
-                    inner: DeviceInner::Direct { fd },
+                    inner: DeviceInner::RelativeMouse { tx, worker },
                 }
             }
             DeviceType::AbsoluteMouse => {
@@ -86,6 +100,9 @@ impl Device {
                 tx.send(KeyboardMsg::Action(KeyboardAction::Press(key)))
                     .expect("keyboard worker stopped");
             }
+            DeviceInner::RelativeMouse { .. } => {
+                panic!("press called on relative mouse device")
+            }
             DeviceInner::Direct { fd } => {
                 Self::emit_fd(*fd, EV_KEY, key, 1);
                 Self::emit_fd(*fd, EV_SYN, SYN_REPORT, 0);
@@ -99,6 +116,9 @@ impl Device {
                 tx.send(KeyboardMsg::Action(KeyboardAction::Release(key)))
                     .expect("keyboard worker stopped");
             }
+            DeviceInner::RelativeMouse { .. } => {
+                panic!("release called on relative mouse device")
+            }
             DeviceInner::Direct { fd } => {
                 Self::emit_fd(*fd, EV_KEY, key, 0);
                 Self::emit_fd(*fd, EV_SYN, SYN_REPORT, 0);
@@ -109,6 +129,10 @@ impl Device {
     pub fn move_relative(&self, x: i32, y: i32) {
         match &self.inner {
             DeviceInner::Keyboard { .. } => panic!("move_relative called on keyboard device"),
+            DeviceInner::RelativeMouse { tx, .. } => {
+                tx.send(RelativeMouseMsg::Action(RelativeMouseAction::Move(x, y)))
+                    .expect("relative mouse worker stopped");
+            }
             DeviceInner::Direct { fd } => {
                 Self::emit_fd(*fd, EV_REL, REL_X, x);
                 Self::emit_fd(*fd, EV_REL, REL_Y, y);
@@ -120,6 +144,9 @@ impl Device {
     pub fn move_absolute(&self, x: i32, y: i32) {
         match &self.inner {
             DeviceInner::Keyboard { .. } => panic!("move_absolute called on keyboard device"),
+            DeviceInner::RelativeMouse { .. } => {
+                panic!("move_absolute called on relative mouse device")
+            }
             DeviceInner::Direct { fd } => {
                 Self::emit_fd(*fd, EV_ABS, ABS_X, x);
                 Self::emit_fd(*fd, EV_ABS, ABS_Y, y);
@@ -260,6 +287,12 @@ impl Drop for Device {
             },
             DeviceInner::Keyboard { tx, worker } => {
                 let _ = tx.send(KeyboardMsg::Shutdown);
+                if let Some(handle) = worker.take() {
+                    let _ = handle.join();
+                }
+            }
+            DeviceInner::RelativeMouse { tx, worker } => {
+                let _ = tx.send(RelativeMouseMsg::Shutdown);
                 if let Some(handle) = worker.take() {
                     let _ = handle.join();
                 }

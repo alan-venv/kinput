@@ -1,10 +1,10 @@
-use crate::types::constants::{EV_KEY, EV_SYN, SYN_REPORT};
+use crate::types::constants::{EV_KEY, EV_REL, EV_SYN, REL_X, REL_Y, SYN_REPORT};
 use crate::types::structs::InputEvent;
 use nix::ioctl_none;
 use std::os::unix::io::RawFd;
 use std::sync::mpsc::Receiver;
 use std::thread::sleep;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 ioctl_none!(ui_dev_destroy, b'U', 2);
 
@@ -60,23 +60,110 @@ impl KeyboardWorker {
     }
 
     fn emit(fd: RawFd, type_: u16, code: u16, value: i32) {
-        let ev = InputEvent {
-            time: libc::timeval {
-                tv_sec: 0,
-                tv_usec: 0,
-            },
-            type_,
-            code,
-            value,
-        };
+        emit(fd, type_, code, value)
+    }
+}
 
-        let size = std::mem::size_of::<InputEvent>();
-        let ret = unsafe { libc::write(fd, &ev as *const _ as *const libc::c_void, size) };
-        if ret != size as isize {
-            panic!(
-                "write failed or partial write: {}",
-                std::io::Error::last_os_error()
-            );
+// RELATIVE MOUSE
+
+#[derive(Debug, Copy, Clone)]
+pub enum RelativeMouseAction {
+    Move(i32, i32),
+}
+
+pub enum RelativeMouseMsg {
+    Action(RelativeMouseAction),
+    Shutdown,
+}
+
+pub struct RelativeMouseWorker {
+    fd: RawFd,
+    rx: Receiver<RelativeMouseMsg>,
+}
+
+impl RelativeMouseWorker {
+    pub fn run(fd: RawFd, rx: Receiver<RelativeMouseMsg>) {
+        let worker = Self { fd, rx };
+        worker.event_loop();
+    }
+
+    fn event_loop(self) {
+        let mut last_execution = Instant::now() - KEYBOARD_ACTION_DELAY;
+        let mut queued_dx: i32 = 0;
+        let mut queued_dy: i32 = 0;
+
+        while let Ok(msg) = self.rx.recv() {
+            match msg {
+                RelativeMouseMsg::Action(RelativeMouseAction::Move(mut dx, mut dy)) => {
+                    // Coalesce any moves already waiting in the channel.
+                    while let Ok(m) = self.rx.try_recv() {
+                        match m {
+                            RelativeMouseMsg::Action(RelativeMouseAction::Move(x, y)) => {
+                                dx += x;
+                                dy += y;
+                            }
+                            RelativeMouseMsg::Shutdown => {
+                                // Execute what we have buffered before shutting down.
+                                queued_dx += dx;
+                                queued_dy += dy;
+                                break;
+                            }
+                        }
+                    }
+
+                    let elapsed = last_execution.elapsed();
+
+                    if elapsed < KEYBOARD_ACTION_DELAY {
+                        queued_dx += dx;
+                        queued_dy += dy;
+                        continue;
+                    }
+
+                    // We're allowed to execute now: include anything queued.
+                    let exec_dx = queued_dx + dx;
+                    let exec_dy = queued_dy + dy;
+                    queued_dx = 0;
+                    queued_dy = 0;
+
+                    if exec_dx != 0 {
+                        emit(self.fd, EV_REL, REL_X, exec_dx);
+                    }
+                    if exec_dy != 0 {
+                        emit(self.fd, EV_REL, REL_Y, exec_dy);
+                    }
+                    emit(self.fd, EV_SYN, SYN_REPORT, 0);
+
+                    last_execution = Instant::now();
+                    sleep(KEYBOARD_ACTION_DELAY);
+                }
+                RelativeMouseMsg::Shutdown => break,
+            }
         }
+
+        unsafe {
+            let _ = ui_dev_destroy(self.fd);
+            let _ = libc::close(self.fd);
+        }
+    }
+}
+
+fn emit(fd: RawFd, type_: u16, code: u16, value: i32) {
+    let ev = InputEvent {
+        time: libc::timeval {
+            tv_sec: 0,
+            tv_usec: 0,
+        },
+        type_,
+        code,
+        value,
+    };
+
+    let size = std::mem::size_of::<InputEvent>();
+    let ret = unsafe { libc::write(fd, &ev as *const _ as *const libc::c_void, size) };
+    if ret != size as isize {
+        panic!(
+            "write failed or partial write: {}",
+            std::io::Error::last_os_error()
+        );
     }
 }
