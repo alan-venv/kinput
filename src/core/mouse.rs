@@ -69,29 +69,23 @@ impl AbsoluteMouse {
     /// Left click.
     pub fn left_click(&self) {
         self.device.press(BTN_LEFT);
-        sleep(Duration::from_millis(10));
         self.device.release(BTN_LEFT);
-        sleep(Duration::from_millis(30));
     }
 
     /// Right click.
     pub fn right_click(&self) {
         self.device.press(BTN_RIGHT);
-        sleep(Duration::from_millis(10));
         self.device.release(BTN_RIGHT);
-        sleep(Duration::from_millis(30));
     }
 
     /// Moves the cursor to (0, 0).
     pub fn reset_axis(&self) {
         self.device.move_absolute(0, 0);
-        sleep(Duration::from_millis(30));
     }
 
     /// Moves the mouse to an absolute position.
     pub fn move_xy(&self, x: i32, y: i32) {
         self.device.move_absolute(self.abs_x(x), self.abs_y(y));
-        sleep(Duration::from_millis(30));
     }
 
     fn abs_x(&self, pixel: i32) -> i32 {

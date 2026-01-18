@@ -58,12 +58,10 @@ mod tests {
         //
 
         for _ in 0..50 {
-            device.mouse.rel.move_xy(-4, 0);
+            device.mouse.abs.move_xy(10, 10);
         }
-        device.mouse.rel.right_click();
         for _ in 0..50 {
-            device.mouse.rel.move_xy(4, 0);
+            device.mouse.abs.move_xy(30, 30);
         }
-        device.mouse.rel.left_click();
     }
 }
