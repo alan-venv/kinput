@@ -2,13 +2,13 @@ use crate::types::constants::{EV_KEY, EV_REL, EV_SYN, REL_X, REL_Y, SYN_REPORT};
 use crate::types::structs::InputEvent;
 use nix::ioctl_none;
 use std::os::unix::io::RawFd;
-use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::sync::mpsc::Receiver;
 use std::thread::sleep;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 ioctl_none!(ui_dev_destroy, b'U', 2);
 
-const KEYBOARD_ACTION_DELAY: Duration = Duration::from_millis(2);
+const ACTION_DELAY: Duration = Duration::from_millis(2);
 
 #[derive(Debug, Copy, Clone)]
 pub enum KeyboardAction {
@@ -47,7 +47,7 @@ impl KeyboardWorker {
                         }
                     }
 
-                    sleep(KEYBOARD_ACTION_DELAY);
+                    sleep(ACTION_DELAY);
                 }
                 KeyboardMsg::Shutdown => break,
             }
@@ -88,50 +88,20 @@ impl RelativeMouseWorker {
     }
 
     fn event_loop(self) {
-        // Fixed coalescing window equal to the action delay.
-        // For each window we emit at most one REL_X/REL_Y pair.
-        let mut queued_dx: i32 = 0;
-        let mut queued_dy: i32 = 0;
-
+        // Same strategy as keyboard: consume -> execute -> wait.
+        // No coalescing; preserves the exact ordering of move events.
         while let Ok(msg) = self.rx.recv() {
             match msg {
                 RelativeMouseMsg::Action(RelativeMouseAction::Move(dx, dy)) => {
-                    queued_dx += dx;
-                    queued_dy += dy;
-
-                    let deadline = Instant::now() + KEYBOARD_ACTION_DELAY;
-
-                    // Coalesce everything that arrives within the window.
-                    loop {
-                        let now = Instant::now();
-                        if now >= deadline {
-                            break;
-                        }
-
-                        match self.rx.recv_timeout(deadline - now) {
-                            Ok(RelativeMouseMsg::Action(RelativeMouseAction::Move(x, y))) => {
-                                queued_dx += x;
-                                queued_dy += y;
-                            }
-                            Ok(RelativeMouseMsg::Shutdown) => {
-                                // Flush what we have and then exit.
-                                break;
-                            }
-                            Err(RecvTimeoutError::Timeout) => break,
-                            Err(RecvTimeoutError::Disconnected) => break,
-                        }
+                    if dx != 0 {
+                        emit(self.fd, EV_REL, REL_X, dx);
                     }
-
-                    if queued_dx != 0 {
-                        emit(self.fd, EV_REL, REL_X, queued_dx);
-                    }
-                    if queued_dy != 0 {
-                        emit(self.fd, EV_REL, REL_Y, queued_dy);
+                    if dy != 0 {
+                        emit(self.fd, EV_REL, REL_Y, dy);
                     }
                     emit(self.fd, EV_SYN, SYN_REPORT, 0);
 
-                    queued_dx = 0;
-                    queued_dy = 0;
+                    sleep(ACTION_DELAY);
                 }
                 RelativeMouseMsg::Shutdown => break,
             }

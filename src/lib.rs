@@ -45,17 +45,23 @@ impl From<(i32, i32)> for InputDevice {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[test]
     fn main() {
         let device = InputDevice::new();
-        device.keyboard.press(Key::LeftShift);
-        device.keyboard.press(Key::Num1);
-        device.keyboard.release(Key::Num1);
-        device.keyboard.release(Key::LeftShift);
+        // device.keyboard.press(Key::LeftShift);
+        // device.keyboard.press(Key::Num1);
+        // device.keyboard.release(Key::Num1);
+        // device.keyboard.release(Key::LeftShift);
+        //
 
-        device.mouse.rel.move_xy(500, 0);
-        device.mouse.rel.move_xy(-450, 0);
+        for _ in 0..50 {
+            device.mouse.rel.move_xy(-4, 0);
+        }
+        for _ in 0..50 {
+            device.mouse.rel.move_xy(4, 0);
+        }
     }
 }
