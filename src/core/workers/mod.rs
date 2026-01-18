@@ -10,7 +10,7 @@ use crate::types::structs::InputEvent;
 use std::os::unix::io::RawFd;
 use std::time::Duration;
 
-const ACTION_DELAY: Duration = Duration::from_millis(2);
+const ACTION_DELAY: Duration = Duration::from_micros(500);
 
 fn emit(fd: RawFd, type_: u16, code: u16, value: i32) {
     let ev = InputEvent {
