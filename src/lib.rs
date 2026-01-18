@@ -58,7 +58,7 @@ mod tests {
             device.mouse.rel.move_xy(10, 0);
         }
 
-        device.mouse.rel.left_click();
         device.mouse.abs.reset_axis();
+        device.mouse.rel.right_click();
     }
 }

@@ -78,7 +78,7 @@ impl AbsoluteMouse {
 
     /// Moves the cursor to (0, 0).
     pub fn reset_axis(&self) {
-        self.device.move_absolute(0, 0);
+        self.device.move_absolute(1, 1);
     }
 
     /// Moves the mouse to an absolute position.
