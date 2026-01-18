@@ -23,14 +23,13 @@ use std::sync::mpsc::{SyncSender, sync_channel};
 use std::thread::{self, JoinHandle, sleep};
 use std::time::Duration;
 
-const KEYBOARD_QUEUE_CAPACITY: usize = 1024;
+const QUEUE_CAPACITY: usize = 1024;
+const DEVICE_READY_DELAY: Duration = Duration::from_millis(500);
 
 /// Low-level wrapper around a `/dev/uinput` device.
 ///
-/// For `DeviceType::Keyboard`, key actions are enqueued into a bounded
-/// `sync_channel` and written by a dedicated worker thread (backpressure).
-///
-/// For other device types, events are written directly to the uinput FD.
+/// Actions are enqueued into a bounded `sync_channel` and written by a
+/// dedicated worker thread (backpressure).
 pub struct Device {
     inner: DeviceInner,
 }
@@ -62,11 +61,9 @@ impl Device {
         match r#type {
             DeviceType::Keyboard => {
                 Self::setup_keyboard(fd);
+                Self::wait_device_ready();
 
-                // Give the kernel/userspace a moment to register the new device.
-                sleep(Duration::from_millis(500));
-
-                let (tx, rx) = sync_channel::<KeyboardMsg>(KEYBOARD_QUEUE_CAPACITY);
+                let (tx, rx) = sync_channel::<KeyboardMsg>(QUEUE_CAPACITY);
                 let worker = Some(thread::spawn(move || KeyboardWorker::run(fd, rx)));
 
                 Self {
@@ -78,11 +75,9 @@ impl Device {
             }
             DeviceType::RelativeMouse => {
                 Self::setup_relative_mouse(fd);
+                Self::wait_device_ready();
 
-                // Give the kernel/userspace a moment to register the new device.
-                sleep(Duration::from_millis(500));
-
-                let (tx, rx) = sync_channel::<RelativeMouseMsg>(KEYBOARD_QUEUE_CAPACITY);
+                let (tx, rx) = sync_channel::<RelativeMouseMsg>(QUEUE_CAPACITY);
                 let worker = Some(thread::spawn(move || RelativeMouseWorker::run(fd, rx)));
 
                 Self {
@@ -94,11 +89,9 @@ impl Device {
             }
             DeviceType::AbsoluteMouse => {
                 Self::setup_absolute_mouse(fd);
+                Self::wait_device_ready();
 
-                // Give the kernel/userspace a moment to register the new device.
-                sleep(Duration::from_millis(500));
-
-                let (tx, rx) = sync_channel::<AbsoluteMouseMsg>(KEYBOARD_QUEUE_CAPACITY);
+                let (tx, rx) = sync_channel::<AbsoluteMouseMsg>(QUEUE_CAPACITY);
                 let worker = Some(thread::spawn(move || AbsoluteMouseWorker::run(fd, rx)));
 
                 Self {
@@ -201,6 +194,11 @@ impl Device {
         fd
     }
 
+    fn wait_device_ready() {
+        // uinput device creation is async; give the system time to register it.
+        sleep(DEVICE_READY_DELAY);
+    }
+
     fn setup_keyboard(fd: RawFd) {
         unsafe {
             ui_set_evbit(fd, EV_KEY as u64).unwrap();
@@ -247,7 +245,6 @@ impl Device {
             ui_dev_setup(fd, &setup).unwrap();
             ui_dev_create(fd).unwrap();
         }
-        sleep(Duration::from_millis(500));
     }
 
     fn setup_absolute_mouse(fd: RawFd) {
@@ -284,7 +281,6 @@ impl Device {
             ui_dev_setup(fd, &setup).unwrap();
             ui_dev_create(fd).unwrap();
         }
-        sleep(Duration::from_millis(500));
     }
 }
 
