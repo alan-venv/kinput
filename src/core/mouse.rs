@@ -45,7 +45,6 @@ impl RelativeMouse {
     /// Moves the cursor to the top-left corner.
     pub fn reset_axis(&self) {
         self.device.move_relative(-10000, -10000);
-        sleep(Duration::from_millis(30));
     }
 
     /// Moves the mouse by a relative delta.

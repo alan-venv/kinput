@@ -2,17 +2,13 @@ use crate::types::constants::{EV_KEY, EV_REL, EV_SYN, REL_X, REL_Y, SYN_REPORT};
 use crate::types::structs::InputEvent;
 use nix::ioctl_none;
 use std::os::unix::io::RawFd;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 ioctl_none!(ui_dev_destroy, b'U', 2);
 
 const KEYBOARD_ACTION_DELAY: Duration = Duration::from_millis(2);
-
-// Upper bound to avoid starving the emitter if producers are extremely fast.
-const REL_MOUSE_DRAIN_LIMIT: usize = 100;
-const REL_MOUSE_DRAIN_BUDGET: Duration = Duration::from_micros(200);
 
 #[derive(Debug, Copy, Clone)]
 pub enum KeyboardAction {
@@ -92,59 +88,50 @@ impl RelativeMouseWorker {
     }
 
     fn event_loop(self) {
-        let mut last_execution = Instant::now() - Duration::from_millis(10);
+        // Fixed coalescing window equal to the action delay.
+        // For each window we emit at most one REL_X/REL_Y pair.
         let mut queued_dx: i32 = 0;
         let mut queued_dy: i32 = 0;
 
         while let Ok(msg) = self.rx.recv() {
             match msg {
-                RelativeMouseMsg::Action(RelativeMouseAction::Move(mut dx, mut dy)) => {
-                    // Coalesce moves already waiting in the channel.
-                    // Guard rails prevent spending unbounded time draining.
-                    let drain_deadline = Instant::now() + REL_MOUSE_DRAIN_BUDGET;
-                    let mut drained = 0usize;
+                RelativeMouseMsg::Action(RelativeMouseAction::Move(dx, dy)) => {
+                    queued_dx += dx;
+                    queued_dy += dy;
 
-                    while drained < REL_MOUSE_DRAIN_LIMIT && Instant::now() < drain_deadline {
-                        match self.rx.try_recv() {
+                    let deadline = Instant::now() + KEYBOARD_ACTION_DELAY;
+
+                    // Coalesce everything that arrives within the window.
+                    loop {
+                        let now = Instant::now();
+                        if now >= deadline {
+                            break;
+                        }
+
+                        match self.rx.recv_timeout(deadline - now) {
                             Ok(RelativeMouseMsg::Action(RelativeMouseAction::Move(x, y))) => {
-                                dx += x;
-                                dy += y;
-                                drained += 1;
+                                queued_dx += x;
+                                queued_dy += y;
                             }
                             Ok(RelativeMouseMsg::Shutdown) => {
-                                // Execute what we have buffered before shutting down.
-                                queued_dx += dx;
-                                queued_dy += dy;
+                                // Flush what we have and then exit.
                                 break;
                             }
-                            Err(_) => break,
+                            Err(RecvTimeoutError::Timeout) => break,
+                            Err(RecvTimeoutError::Disconnected) => break,
                         }
                     }
 
-                    let elapsed = last_execution.elapsed();
-
-                    if elapsed < KEYBOARD_ACTION_DELAY {
-                        queued_dx += dx;
-                        queued_dy += dy;
-                        continue;
+                    if queued_dx != 0 {
+                        emit(self.fd, EV_REL, REL_X, queued_dx);
                     }
-
-                    // We're allowed to execute now: include anything queued.
-                    let exec_dx = queued_dx + dx;
-                    let exec_dy = queued_dy + dy;
-                    queued_dx = 0;
-                    queued_dy = 0;
-
-                    if exec_dx != 0 {
-                        emit(self.fd, EV_REL, REL_X, exec_dx);
-                    }
-                    if exec_dy != 0 {
-                        emit(self.fd, EV_REL, REL_Y, exec_dy);
+                    if queued_dy != 0 {
+                        emit(self.fd, EV_REL, REL_Y, queued_dy);
                     }
                     emit(self.fd, EV_SYN, SYN_REPORT, 0);
 
-                    last_execution = Instant::now();
-                    sleep(KEYBOARD_ACTION_DELAY);
+                    queued_dx = 0;
+                    queued_dy = 0;
                 }
                 RelativeMouseMsg::Shutdown => break,
             }
