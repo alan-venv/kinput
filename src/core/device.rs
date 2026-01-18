@@ -1,9 +1,9 @@
 use crate::core::worker::{
-    KeyboardAction, KeyboardMsg, KeyboardWorker, RelativeMouseAction, RelativeMouseMsg,
-    RelativeMouseWorker,
+    AbsoluteMouseAction, AbsoluteMouseMsg, AbsoluteMouseWorker, KeyboardAction, KeyboardMsg,
+    KeyboardWorker, RelativeMouseAction, RelativeMouseMsg, RelativeMouseWorker,
 };
 use crate::types::constants::*;
-use crate::types::structs::{InputEvent, UInputAbsSetup, UInputSetup};
+use crate::types::structs::{UInputAbsSetup, UInputSetup};
 
 use nix::ioctl_none;
 use nix::ioctl_write_int;
@@ -36,15 +36,16 @@ pub struct Device {
 }
 
 enum DeviceInner {
-    Direct {
-        fd: RawFd,
-    },
     Keyboard {
         tx: Option<SyncSender<KeyboardMsg>>,
         worker: Option<JoinHandle<()>>,
     },
     RelativeMouse {
         tx: Option<SyncSender<RelativeMouseMsg>>,
+        worker: Option<JoinHandle<()>>,
+    },
+    AbsoluteMouse {
+        tx: Option<SyncSender<AbsoluteMouseMsg>>,
         worker: Option<JoinHandle<()>>,
     },
 }
@@ -93,8 +94,18 @@ impl Device {
             }
             DeviceType::AbsoluteMouse => {
                 Self::setup_absolute_mouse(fd);
+
+                // Give the kernel/userspace a moment to register the new device.
+                sleep(Duration::from_millis(500));
+
+                let (tx, rx) = sync_channel::<AbsoluteMouseMsg>(KEYBOARD_QUEUE_CAPACITY);
+                let worker = Some(thread::spawn(move || AbsoluteMouseWorker::run(fd, rx)));
+
                 Self {
-                    inner: DeviceInner::Direct { fd },
+                    inner: DeviceInner::AbsoluteMouse {
+                        tx: Some(tx),
+                        worker,
+                    },
                 }
             }
         }
@@ -114,9 +125,11 @@ impl Device {
                     .send(RelativeMouseMsg::Action(RelativeMouseAction::Press(key)))
                     .expect("relative mouse worker stopped");
             }
-            DeviceInner::Direct { fd } => {
-                Self::emit_fd(*fd, EV_KEY, key, 1);
-                Self::emit_fd(*fd, EV_SYN, SYN_REPORT, 0);
+            DeviceInner::AbsoluteMouse { tx, .. } => {
+                tx.as_ref()
+                    .expect("absolute mouse sender missing")
+                    .send(AbsoluteMouseMsg::Action(AbsoluteMouseAction::Press(key)))
+                    .expect("absolute mouse worker stopped");
             }
         }
     }
@@ -135,9 +148,11 @@ impl Device {
                     .send(RelativeMouseMsg::Action(RelativeMouseAction::Release(key)))
                     .expect("relative mouse worker stopped");
             }
-            DeviceInner::Direct { fd } => {
-                Self::emit_fd(*fd, EV_KEY, key, 0);
-                Self::emit_fd(*fd, EV_SYN, SYN_REPORT, 0);
+            DeviceInner::AbsoluteMouse { tx, .. } => {
+                tx.as_ref()
+                    .expect("absolute mouse sender missing")
+                    .send(AbsoluteMouseMsg::Action(AbsoluteMouseAction::Release(key)))
+                    .expect("absolute mouse worker stopped");
             }
         }
     }
@@ -145,16 +160,14 @@ impl Device {
     pub fn move_relative(&self, x: i32, y: i32) {
         match &self.inner {
             DeviceInner::Keyboard { .. } => panic!("move_relative called on keyboard device"),
+            DeviceInner::AbsoluteMouse { .. } => {
+                panic!("move_relative called on absolute mouse device")
+            }
             DeviceInner::RelativeMouse { tx, .. } => {
                 tx.as_ref()
                     .expect("relative mouse sender missing")
                     .send(RelativeMouseMsg::Action(RelativeMouseAction::Move(x, y)))
                     .expect("relative mouse worker stopped");
-            }
-            DeviceInner::Direct { fd } => {
-                Self::emit_fd(*fd, EV_REL, REL_X, x);
-                Self::emit_fd(*fd, EV_REL, REL_Y, y);
-                Self::emit_fd(*fd, EV_SYN, SYN_REPORT, 0);
             }
         }
     }
@@ -165,10 +178,11 @@ impl Device {
             DeviceInner::RelativeMouse { .. } => {
                 panic!("move_absolute called on relative mouse device")
             }
-            DeviceInner::Direct { fd } => {
-                Self::emit_fd(*fd, EV_ABS, ABS_X, x);
-                Self::emit_fd(*fd, EV_ABS, ABS_Y, y);
-                Self::emit_fd(*fd, EV_SYN, SYN_REPORT, 0);
+            DeviceInner::AbsoluteMouse { tx, .. } => {
+                tx.as_ref()
+                    .expect("absolute mouse sender missing")
+                    .send(AbsoluteMouseMsg::Action(AbsoluteMouseAction::Move(x, y)))
+                    .expect("absolute mouse worker stopped");
             }
         }
     }
@@ -272,37 +286,11 @@ impl Device {
         }
         sleep(Duration::from_millis(500));
     }
-
-    // Será removido quando os mouses também tiverem seus workers
-    fn emit_fd(fd: RawFd, type_: u16, code: u16, value: i32) {
-        let ev = InputEvent {
-            time: libc::timeval {
-                tv_sec: 0,
-                tv_usec: 0,
-            },
-            type_,
-            code,
-            value,
-        };
-
-        let size = std::mem::size_of::<InputEvent>();
-        let ret = unsafe { libc::write(fd, &ev as *const _ as *const libc::c_void, size) };
-        if ret != size as isize {
-            panic!(
-                "write failed or partial write: {}",
-                std::io::Error::last_os_error()
-            );
-        }
-    }
 }
 
 impl Drop for Device {
     fn drop(&mut self) {
         match &mut self.inner {
-            DeviceInner::Direct { fd } => unsafe {
-                let _ = ui_dev_destroy(*fd);
-                let _ = libc::close(*fd);
-            },
             DeviceInner::Keyboard { tx, worker } => {
                 // Drop the sender first so the worker can exit even if no one
                 // is receiving the shutdown message.
@@ -316,6 +304,14 @@ impl Drop for Device {
             DeviceInner::RelativeMouse { tx, worker } => {
                 if let Some(tx) = tx.take() {
                     let _ = tx.send(RelativeMouseMsg::Shutdown);
+                }
+                if let Some(handle) = worker.take() {
+                    let _ = handle.join();
+                }
+            }
+            DeviceInner::AbsoluteMouse { tx, worker } => {
+                if let Some(tx) = tx.take() {
+                    let _ = tx.send(AbsoluteMouseMsg::Shutdown);
                 }
                 if let Some(handle) = worker.take() {
                     let _ = handle.join();
