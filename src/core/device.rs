@@ -108,8 +108,11 @@ impl Device {
                     .send(KeyboardMsg::Action(KeyboardAction::Press(key)))
                     .expect("keyboard worker stopped");
             }
-            DeviceInner::RelativeMouse { .. } => {
-                panic!("press called on relative mouse device")
+            DeviceInner::RelativeMouse { tx, .. } => {
+                tx.as_ref()
+                    .expect("relative mouse sender missing")
+                    .send(RelativeMouseMsg::Action(RelativeMouseAction::Press(key)))
+                    .expect("relative mouse worker stopped");
             }
             DeviceInner::Direct { fd } => {
                 Self::emit_fd(*fd, EV_KEY, key, 1);
@@ -126,8 +129,11 @@ impl Device {
                     .send(KeyboardMsg::Action(KeyboardAction::Release(key)))
                     .expect("keyboard worker stopped");
             }
-            DeviceInner::RelativeMouse { .. } => {
-                panic!("release called on relative mouse device")
+            DeviceInner::RelativeMouse { tx, .. } => {
+                tx.as_ref()
+                    .expect("relative mouse sender missing")
+                    .send(RelativeMouseMsg::Action(RelativeMouseAction::Release(key)))
+                    .expect("relative mouse worker stopped");
             }
             DeviceInner::Direct { fd } => {
                 Self::emit_fd(*fd, EV_KEY, key, 0);

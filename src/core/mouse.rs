@@ -29,17 +29,13 @@ impl RelativeMouse {
     /// Left click.
     pub fn left_click(&self) {
         self.device.press(BTN_LEFT);
-        sleep(Duration::from_millis(10));
         self.device.release(BTN_LEFT);
-        sleep(Duration::from_millis(30));
     }
 
     /// Right click.
     pub fn right_click(&self) {
         self.device.press(BTN_RIGHT);
-        sleep(Duration::from_millis(10));
         self.device.release(BTN_RIGHT);
-        sleep(Duration::from_millis(30));
     }
 
     /// Moves the cursor to the top-left corner.
