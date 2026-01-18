@@ -1,6 +1,7 @@
 mod device;
 mod keyboard;
 mod mouse;
+mod uinput;
 mod worker;
 
 pub use device::AbsoluteMouseDevice;
