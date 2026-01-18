@@ -1,7 +1,10 @@
 mod core;
 mod types;
 
-use crate::core::{AbsoluteMouse, Device, DeviceType, Keyboard, Mouse, RelativeMouse};
+use crate::core::{
+    AbsoluteMouse, AbsoluteMouseDevice, Keyboard, KeyboardDevice, Mouse, RelativeMouse,
+    RelativeMouseDevice,
+};
 use std::rc::Rc;
 
 /// Keyboard keys supported by `kinput`.
@@ -25,9 +28,9 @@ impl InputDevice {
 impl From<(i32, i32)> for InputDevice {
     /// Creates a new `InputDevice` with a custom absolute mouse area.
     fn from((width, height): (i32, i32)) -> Self {
-        let keyboard_device = Device::new(DeviceType::Keyboard);
-        let relative_mouse_device = Device::new(DeviceType::RelativeMouse);
-        let absolute_mouse_device = Device::new(DeviceType::AbsoluteMouse);
+        let keyboard_device = KeyboardDevice::new();
+        let relative_mouse_device = RelativeMouseDevice::new();
+        let absolute_mouse_device = AbsoluteMouseDevice::new();
 
         let keyboard = Keyboard::new(Rc::new(keyboard_device));
         let relative_mouse = RelativeMouse::new(Rc::new(relative_mouse_device));
@@ -38,30 +41,24 @@ impl From<(i32, i32)> for InputDevice {
                 rel: relative_mouse,
                 abs: absolute_mouse,
             },
-            keyboard: keyboard,
+            keyboard,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]
     fn main() {
         let device = InputDevice::new();
-        // device.keyboard.press(Key::LeftShift);
-        // device.keyboard.press(Key::Num1);
-        // device.keyboard.release(Key::Num1);
-        // device.keyboard.release(Key::LeftShift);
-        //
 
-        for _ in 0..50 {
-            device.mouse.abs.move_xy(10, 10);
+        for _ in 0..20 {
+            device.mouse.rel.move_xy(10, 0);
         }
-        for _ in 0..50 {
-            device.mouse.abs.move_xy(30, 30);
-        }
+
+        device.mouse.rel.left_click();
+        device.mouse.abs.reset_axis();
     }
 }

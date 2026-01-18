@@ -1,17 +1,17 @@
 use std::rc::Rc;
 
-use crate::core::device::Device;
+use crate::core::KeyboardDevice;
 use crate::types::enums::Key;
 
 /// Keyboard for sending key events.
 pub struct Keyboard {
-    device: Rc<Device>,
+    device: Rc<KeyboardDevice>,
 }
 
 impl Keyboard {
     /// Creates a `Keyboard`.
-    pub fn new(device: Rc<Device>) -> Keyboard {
-        return Keyboard { device: device };
+    pub fn new(device: Rc<KeyboardDevice>) -> Keyboard {
+        Keyboard { device }
     }
 
     /// Types a sequence of keys.

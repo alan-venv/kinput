@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::core::device::Device;
+use crate::core::{AbsoluteMouseDevice, RelativeMouseDevice};
 use crate::types::constants::{BTN_LEFT, BTN_RIGHT};
 
 /// Mouse controls.
@@ -15,12 +15,12 @@ pub struct Mouse {
 
 /// Relative mouse for movement and clicks.
 pub struct RelativeMouse {
-    device: Rc<Device>,
+    device: Rc<RelativeMouseDevice>,
 }
 
 impl RelativeMouse {
     /// Creates a `RelativeMouse`.
-    pub fn new(device: Rc<Device>) -> Self {
+    pub fn new(device: Rc<RelativeMouseDevice>) -> Self {
         Self { device }
     }
 
@@ -49,14 +49,14 @@ impl RelativeMouse {
 
 /// Absolute mouse for movement and clicks.
 pub struct AbsoluteMouse {
-    device: Rc<Device>,
+    device: Rc<AbsoluteMouseDevice>,
     width: i32,
     height: i32,
 }
 
 impl AbsoluteMouse {
     /// Creates an `AbsoluteMouse`.
-    pub fn new(device: Rc<Device>, width: i32, height: i32) -> Self {
+    pub fn new(device: Rc<AbsoluteMouseDevice>, width: i32, height: i32) -> Self {
         Self {
             device,
             width,
