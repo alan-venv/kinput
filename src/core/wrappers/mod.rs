@@ -1,10 +1,10 @@
-mod absolute_mouse;
+mod absolute;
 mod keyboard;
-mod relative_mouse;
+mod relative;
 
-pub use absolute_mouse::AbsoluteMouse;
+pub use absolute::AbsoluteMouse;
 pub use keyboard::Keyboard;
-pub use relative_mouse::RelativeMouse;
+pub use relative::RelativeMouse;
 
 /// Mouse controls.
 ///

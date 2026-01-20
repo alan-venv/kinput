@@ -1,9 +1,9 @@
-mod absolute_mouse;
+mod absolute;
 mod keyboard;
-mod relative_mouse;
+mod relative;
 
-pub use absolute_mouse::AbsoluteMouseDevice;
+pub use absolute::AbsoluteMouseDevice;
 pub use keyboard::KeyboardDevice;
-pub use relative_mouse::RelativeMouseDevice;
+pub use relative::RelativeMouseDevice;
 
 const QUEUE_CAPACITY: usize = 1024;

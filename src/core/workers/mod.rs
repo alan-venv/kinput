@@ -1,10 +1,10 @@
-mod absolute_mouse;
+mod absolute;
 mod keyboard;
-mod relative_mouse;
+mod relative;
 
-pub use absolute_mouse::{AbsoluteMouseAction, AbsoluteMouseMsg, AbsoluteMouseWorker};
+pub use absolute::{AbsoluteMouseAction, AbsoluteMouseMsg, AbsoluteMouseWorker};
 pub use keyboard::{KeyboardAction, KeyboardMsg, KeyboardWorker};
-pub use relative_mouse::{RelativeMouseAction, RelativeMouseMsg, RelativeMouseWorker};
+pub use relative::{RelativeMouseAction, RelativeMouseMsg, RelativeMouseWorker};
 
 use crate::types::structs::InputEvent;
 use std::os::unix::io::RawFd;
