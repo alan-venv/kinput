@@ -4,7 +4,7 @@ version = "0.3.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/alan-venv/kinput"
-description = "Low-level Rust library for input injection on Linux"
+description = "Low-level Rust library for input injection and global key capture on Linux"
 keywords = ["lib", "utils", "input", "keyboard", "mouse"]
 
 [dependencies]
