@@ -1,10 +1,14 @@
 mod core;
+mod reader;
 mod types;
 
 use crate::core::{AbsoluteMouse, Keyboard, Mouse, RelativeMouse};
 use crate::core::{AbsoluteMouseDevice, KeyboardDevice, RelativeMouseDevice};
 
 use std::rc::Rc;
+
+/// Input keyboard reader
+pub use reader::InputReader;
 
 /// Keyboard keys supported by `kinput`.
 pub use crate::types::enums::Key;
