@@ -33,7 +33,7 @@ fn main() {
 }
 ```
 
-## Usage (Input)
+## Usage (Reader)
 
 ```rust
 use kinput::{InputReader, Key::*};
