@@ -1,4 +1,4 @@
-# kinput
+# Kinput
 
 Low-level Rust library for input injection and global key capture on Linux.
 
@@ -7,13 +7,12 @@ Creates and manages virtual keyboard and mouse devices directly in the kernel in
 ## Features
 
 - Kernel-level virtual input devices
-- Keyboard and mouse support
+- Keyboard and mouse support (real-hardware equivalent)
 - Global key capture
-- Global input delivery (real-hardware equivalent)
 - No graphical or compositor dependencies
 - Minimal, low-level API
 
-## Usage
+## Usage (Input)
 
 ```rust
 use kinput::{InputDevice, Key::*};
@@ -31,6 +30,23 @@ fn main() {
     // Absolute positioning.
     device.mouse.abs.move_xy(300, 300);
     device.mouse.abs.left_click();
+}
+```
+
+## Usage (Input)
+
+```rust
+use kinput::{InputReader, Key::*};
+
+fn main() {
+    let mut reader = InputReader::new();
+    reader.start().unwrap();
+
+    while let Ok(key) = reader.receive() {
+        if key == A {
+            println!("A key pressed");
+        }
+    }
 }
 ```
 
