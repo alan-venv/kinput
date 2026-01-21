@@ -6,8 +6,8 @@ Creates virtual devices and captures global input events directly via the kernel
 
 ## ✨ Features
 
-- 🐧 **Kernel-Level:** Direct virtual device management via `uinput`.
-- ⌨️ **Full Input Support:** Keyboard, mouse (relative/absolute), and text injection.
+- 🐧 **Kernel-Level:** Native virtual device management.
+- ⌨️ **Full Input Support:** Keyboard and mouse (relative/absolute) events injection.
 - 🎧 **Global Capture:** Reads events from physical devices regardless of window focus.
 - 🚫 **Headless:** No dependencies on X11, Wayland, or compositors.
 - ⚡ **Minimal API:** Simple, idiomatic Rust interface.
@@ -52,7 +52,10 @@ fn main() {
 }
 ```
 
-## Setup script for non-root user
+## 🔧 Non-Root Setup
+
+Run this script to configure permissions and use the library without `sudo`.
+
 ```bash
 #!/bin/bash
 
@@ -68,12 +71,14 @@ else
     sudo udevadm trigger
     sudo usermod -aG input "$USER"
 fi
+
 ```
-Logout and login required.
 
-## Scope
+> **Note:** A system logout/login is required for changes to take effect.
 
-* Bots
-* Automated testing
-* Accessibility tooling
-* Device emulation
+## 🎯 Scope
+
+* 🤖 **Bots & Automation**
+* 🧪 **Automated Testing**
+* ♿ **Accessibility Tooling**
+* 🎮 **Device Emulation**
