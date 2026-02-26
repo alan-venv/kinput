@@ -90,6 +90,7 @@ pub enum Key {
     Pause,
     BtnLeft,
     BtnRight,
+    BtnMiddle,
 }
 
 impl Key {
@@ -186,6 +187,7 @@ impl Key {
             Self::Pause => 119,
             Self::BtnLeft => 272,
             Self::BtnRight => 273,
+            Self::BtnMiddle => 274,
         }
     }
 
@@ -282,6 +284,7 @@ impl Key {
             119 => Some(Self::Pause),
             272 => Some(Self::BtnLeft),
             273 => Some(Self::BtnRight),
+            274 => Some(Self::BtnMiddle),
             _ => None,
         }
     }

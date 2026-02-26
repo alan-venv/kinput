@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use crate::core::AbsoluteMouseDevice;
-use crate::types::constants::{BTN_LEFT, BTN_RIGHT};
+use crate::types::constants::{BTN_LEFT, BTN_MIDDLE, BTN_RIGHT};
 
 /// Absolute mouse for movement and clicks.
 pub struct AbsoluteMouse {
@@ -30,6 +30,12 @@ impl AbsoluteMouse {
     pub fn right_click(&self) {
         self.device.press(BTN_RIGHT);
         self.device.release(BTN_RIGHT);
+    }
+
+    /// Middle click.
+    pub fn middle_click(&self) {
+        self.device.press(BTN_MIDDLE);
+        self.device.release(BTN_MIDDLE);
     }
 
     /// Moves the cursor to (0, 0).

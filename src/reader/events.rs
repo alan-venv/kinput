@@ -38,6 +38,7 @@ pub fn normalize_event(ev: &libc::input_event) -> Option<Key> {
         return None;
     }
 
+    // 0 released // 1 press // autorepeat
     if ev.value != 0 {
         return Key::from_code(ev.code);
     }

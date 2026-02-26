@@ -67,6 +67,7 @@ pub fn setup_relative_mouse(fd: RawFd) {
         ui_set_evbit(fd, EV_KEY as u64).unwrap();
         ui_set_keybit(fd, BTN_LEFT as u64).unwrap();
         ui_set_keybit(fd, BTN_RIGHT as u64).unwrap();
+        ui_set_keybit(fd, BTN_MIDDLE as u64).unwrap();
 
         ui_set_evbit(fd, EV_REL as u64).unwrap();
         ui_set_relbit(fd, REL_X as u64).unwrap();
@@ -92,6 +93,7 @@ pub fn setup_absolute_mouse(fd: RawFd) {
         ui_set_evbit(fd, EV_KEY as u64).unwrap();
         ui_set_keybit(fd, BTN_LEFT as u64).unwrap();
         ui_set_keybit(fd, BTN_RIGHT as u64).unwrap();
+        ui_set_keybit(fd, BTN_MIDDLE as u64).unwrap();
 
         ui_set_evbit(fd, EV_ABS as u64).unwrap();
         ui_set_absbit(fd, ABS_X as u64).unwrap();
