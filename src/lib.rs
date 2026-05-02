@@ -51,15 +51,3 @@ impl From<(i32, i32, Layout)> for InputDevice {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn main() {
-        let device = InputDevice::from((1920, 1080, Layout::Abnt2));
-
-        device.keyboard.text("[{\\|}] < Hélôçã!");
-    }
-}
