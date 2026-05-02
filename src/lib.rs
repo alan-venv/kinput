@@ -13,6 +13,9 @@ pub use reader::InputReader;
 /// Keyboard keys supported by `kinput`.
 pub use crate::types::enums::Key;
 
+/// Keyboard layouts supported by `kinput`.
+pub use crate::types::enums::Layout;
+
 /// Virtual input device with keyboard and mouse.
 pub struct InputDevice {
     /// Mouse actions.
@@ -24,18 +27,18 @@ pub struct InputDevice {
 impl InputDevice {
     /// Creates a new `InputDevice` with a default absolute mouse area of `1920x1080`.
     pub fn new() -> Self {
-        Self::from((1920, 1080))
+        Self::from((1920, 1080, Layout::Us))
     }
 }
 
-impl From<(i32, i32)> for InputDevice {
+impl From<(i32, i32, Layout)> for InputDevice {
     /// Creates a new `InputDevice` with a custom absolute mouse area.
-    fn from((width, height): (i32, i32)) -> Self {
+    fn from((width, height, layout): (i32, i32, Layout)) -> Self {
         let keyboard_device = KeyboardDevice::new();
         let relative_mouse_device = RelativeMouseDevice::new();
         let absolute_mouse_device = AbsoluteMouseDevice::new();
 
-        let keyboard = Keyboard::new(Rc::new(keyboard_device));
+        let keyboard = Keyboard::new(Rc::new(keyboard_device), layout);
         let relative_mouse = RelativeMouse::new(Rc::new(relative_mouse_device));
         let absolute_mouse = AbsoluteMouse::new(Rc::new(absolute_mouse_device), width, height);
 
@@ -46,5 +49,17 @@ impl From<(i32, i32)> for InputDevice {
             },
             keyboard,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn main() {
+        let device = InputDevice::from((1920, 1080, Layout::Abnt2));
+
+        device.keyboard.text("[{\\|}] < Hélôçã!");
     }
 }
