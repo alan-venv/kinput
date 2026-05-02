@@ -17,12 +17,12 @@ Creates virtual devices and captures global input events directly via the kernel
 ### Injection
 
 ```rust
-use kinput::{InputDevice, Key::*};
+use kinput::InputDevice;
 
 fn main() {
     let device = InputDevice::new();
 
-    device.keyboard.text([H, E, L, L, O, Space, W, O, R, L, D]);
+    device.keyboard.text("Hello world!");
 
     // Relative movement.
     device.mouse.rel.reset_axis();
